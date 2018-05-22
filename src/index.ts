@@ -11,10 +11,11 @@ class stage extends Stage {
     console.log('stage');
   }
 }
+
 class container extends Container {
   public scalStep: number = 1.1;
   public scale: number = 1;
-  public oldScale: number = 1;
+  private oldScale: number = 1;
   checkAround() {
     if (this.x > 0) {
       this.x = 0;
@@ -27,7 +28,7 @@ class container extends Container {
     this.children.forEach(element => {
       if (!!element.img) {
         width = element.width - window.innerWidth;
-        height = element.height - window.innerWidth;
+        height = element.height - window.innerHeight;
       }
     });
     if (this.x < -width) {
@@ -37,16 +38,21 @@ class container extends Container {
       this.y = -height;
     }
   }
-  scaleBig() {
-    let center = this.getCenter();
+  scaleBig(zoom?) {
     this.scale *= this.scalStep;
+    this.scaleCommon();
+  }
+  scaleSmall(zoom?) {
+    this.scale /= this.scalStep;
+    this.scaleCommon();
+  }
+
+  private scaleCommon() {
+    let center = this.getCenter();
     this.x = this.x + (center.x * this.scale - center.x * this.oldScale);
     this.y = this.y + (center.y * this.scale - center.y * this.oldScale);
-    this.oldScale = this.scaleX;
+    this.oldScale = this.scale;
     this.checkAround();
-  }
-  scaleSmall() {
-    this.scale /= this.scalStep;
   }
   getCenter() {
     return {
@@ -54,46 +60,22 @@ class container extends Container {
       y: this.y - window.innerHeight / 2,
     };
   }
-  constructor(stage) {
+  constructor() {
     super();
-    new AlloyFinger(this, {
-      multipointStart: function() {
-        this.scale = this.scaleX;
-      },
-      pinch: function(e) {
-        this.scaleX = this.scaleY = this.scale * e.scale;
-        stage.update();
-      },
-      pressMove: function(e) {
-        e.preventDefault();
-        this.x += e.deltaX;
-        this.y += e.deltaY;
-        this.checkAround();
-        stage.update();
-      },
-    });
-    stage.add(this);
-    stage.update();
   }
 }
 
 class btn {
   btn: Element;
-  constructor(id: string, stage: stage, contain: container) {
+  click(fn) {
+    this.btn.addEventListener('click', fn);
+  }
+  constructor(id: string) {
     this.btn = document.getElementById(id);
-    this.btn.addEventListener('click', () => {
-      if (id == 'big') {
-        contain.scaleBig();
-        stage.update();
-      } else {
-        contain.scaleSmall();
-        stage.update();
-      }
-    });
   }
 }
 class load extends Loader {
-  constructor(stage, container, src) {
+  constructor(src) {
     super();
     this.loadRes([
       {
@@ -101,39 +83,73 @@ class load extends Loader {
         src,
       },
     ]);
-    console.log('load');
-
-    this.complete(() => {
-      console.log('complete');
-
-      const img = new Bitmap(this.get('image'));
-      container.add(img);
-      stage.update();
-    });
+  }
+  getImg() {
+    return new Bitmap(this.get('image'));
   }
 }
 let st1 = new stage('#canvas');
-let contain = new container(st1);
-let big = new btn('big', st1, contain);
-let small = new btn('small', st1, contain);
+let contain = new container();
 
-new load(st1, contain, '/dist/images/chooseBg.jpg');
+let big = new btn('big');
 
-// stage s = new stage();
-// s.add(container);
-// container = new container;
-// container.add(new button)
-// container.add(new button2)
+let small = new btn('small');
+var ld = new load('/dist/images/chooseBg.jpg');
+var mousex = 0;
+var mousey = 0;
+var oldZoom = 1;
+new AlloyFinger(contain, {
+  multipointStart: function(event) {
+    st1.clear();
+    mousex =
+      (event.touches[0].pageX + event.touches[1].pageX) / 2 -
+      this.x / this.scale;
+    // alert(mousex);
+    mousey =
+      (event.touches[0].pageY + event.touches[1].pageY) / 2 -
+      this.y / this.scale;
+  },
+  pinch: function(e) {
+    // alert(this.scale);
 
-// add(Button button) {
-//   button.setContainer(this);
+    e.preventDefault();
+    let zoom = e.zoom;
+    this.scale = zoom;
+    this.x -= mousex * (zoom - oldZoom);
+    this.y -= mousey * (zoom - oldZoom);
+    oldZoom = zoom;
+    st1.update();
+    this.checkAround();
 
-//   buttons.add(button);
-// }
+    // oldZoom = zoom;
+  },
+  pressMove: function(e) {
+    // console.log(st1);
 
-// button.addClickListener() {
-//   void action() {
-//     this.getContainer.scala()
-//     this.getContainer.getStage.update()
-//   }
-// }
+    e.preventDefault();
+    this.x += e.deltaX;
+    this.y += e.deltaY;
+    this.checkAround();
+    st1.update();
+  },
+});
+
+ld.complete(() => {
+  let img = ld.getImg();
+  contain.add(img);
+  st1.update();
+  console.log('Bb');
+});
+
+big.click(() => {
+  contain.scaleBig();
+  st1.update();
+});
+small.click(() => {
+  contain.scaleSmall();
+  st1.update();
+});
+console.log('Aa');
+
+st1.add(contain);
+st1.update();
